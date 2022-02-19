@@ -27,15 +27,65 @@ class DataCollection
     public function reorder(): self
     {
         usort($this->items, static function(Data $a, Data $b) {
-            return $a->dislikedCount <=> $b->dislikedCount;
+            return $a->dislikedCount < $b->dislikedCount;
+        });
+
+        return $this;
+    }
+    public function reorderBack(): self
+    {
+        usort($this->items, static function(Data $a, Data $b) {
+            sort($a->disliked);
+            sort($b->disliked);
+            $implodeA      = implode('_', $a->disliked);
+            $substrCountA = substr_count($implodeA, '_');
+            $implodeB     = implode('_', $b->disliked);
+            $substrCountB = substr_count($implodeB, '_');
+            if ($implodeA === '' || $implodeB === '') {
+                return strlen($implodeA) > strlen($implodeB);
+            }
+            return $substrCountA > $substrCountB;
         });
 
         return $this;
     }
 
-    public function remove(int $key): self
+    public function moveTopToTheEnd(): self
     {
-        unset($this->items[$key]);
+        $result = [];
+        foreach ($this->items as $item) {
+            $key = implode('_', $item->disliked);
+            $result[$key] = isset($result[$key]) ? ++$result[$key] : 1;
+        }
+        uasort($result, static function(string $a, string $b) {
+                $substrCountA = substr_count($a, '_');
+                $substrCountB = substr_count($b, '_');
+                if ($substrCountA === $substrCountB) {
+                    return 0;
+                }
+                return $substrCountA < $substrCountB ? 1 : -1;
+        });
+        $ret = new DataCollection();
+        $ret->items = $this->items;
+        $filter = array_key_first($result);
+        if ($filter === '') {
+            $ret->items = array_filter($ret->items, static function(Data $data) use ($filter) {
+                return implode('_', $data->disliked) === $filter;
+            });
+            $this->items = array_filter($this->items, static function(Data $data) use ($filter) {
+                return implode('_', $data->disliked) !== $filter;
+            });
+        } else {
+            $substrCount = substr_count($filter, '_');
+            $ret->items = array_filter($ret->items, static function(Data $data) use ($substrCount) {
+                return substr_count(implode('_', $data->disliked), '_') <= $substrCount;
+            });
+            $this->items = array_filter($this->items, static function(Data $data) use ($substrCount) {
+                return substr_count(implode('_', $data->disliked), '_') > $substrCount;
+            });
+        }
+        $this->items = array_filter($this->items);
+        $this->items = array_merge($this->items, $ret->items);
 
         return $this;
     }
@@ -84,33 +134,44 @@ for ($i = 1; $i <= $max; ) {
 }
 
 /**
- * @param  array  $all
  * @param  DataCollection  $dataCollection
- * @param  int  $maxDislikeDepth
  *
  * @return array
  */
-function getResultWithDepth(array $all, DataCollection $dataCollection, int $maxDislikeDepth = 0): array
+#[Pure] function getResultWithDepth(DataCollection $dataCollection): array
 {
-    $result = [];
-    array_push($all, '');
-    sort($all);
-    $dataCollection->reorder();
-    ;
-    foreach ($all as $product) {
-        foreach ($dataCollection->all() as $key => $item) {
-            if (
-                count($item->disliked) <= $maxDislikeDepth
-                && ([] === $item->disliked || in_array($product, $item->disliked))
-                && !in_array($product, $result)
-            ) {
-                $result = array_unique(array_merge($result, $item->liked), SORT_REGULAR);
-                $dataCollection->remove($key);
+    $disliked = $liked = [];
+    $client = 0;
+    $data     = $dataCollection->all();
+    foreach ($data as $item) {
+        $flag = false;
+        foreach ($item->disliked as $itemDisliked) {
+            if (in_array($itemDisliked, array_keys($liked))) {
+                $flag = true;
             }
         }
+        if ($flag) {
+            continue;
+        }
+        foreach ($item->liked as $itemLiked) {
+            if (in_array($itemLiked, array_keys($disliked))) {
+                $flag = true;
+            }
+        }
+        if ($flag) {
+            continue;
+        }
+        foreach ($item->disliked as $itemDisliked) {
+            $disliked[$itemDisliked] = true;
+        }
+        foreach ($item->liked as $itemLiked) {
+            $liked[$itemLiked] = true;
+
+        }
+        $client++;
     }
 
-    return $result;
+    return [$client, array_keys($liked)];
 }
 
 /**
@@ -145,17 +206,23 @@ function getResultWithDepth(array $all, DataCollection $dataCollection, int $max
 
 $theBest = $client = $badResult = 0;
 $theBestResults = [];
-foreach (range(0,11) as $depth) {
-    $result = getResultWithDepth($all, clone $dataCollection, $depth);
-    $client = getClientCounter($dataCollection, $result);
+array_push($all, '');
+sort($all);
+$dataCollection->reorderBack();
+$tt = $badResult = 0;
+$maxx = (int) (count($dataCollection->all()) / 10);
+$sliceDataCollection = $dataCollection;
+while (true) {
+    [$client, $result] = getResultWithDepth($sliceDataCollection);
     if ($client > $theBest) {
         $badResult = 0;
         $theBest = $client;
         $theBestResults = $result;
+        $sliceDataCollection = $sliceDataCollection->moveTopToTheEnd();
     } else {
         $badResult++;
     }
-    if ($badResult === 3) {
+    if ($badResult === 10) {
         break;
     }
 }
@@ -168,3 +235,5 @@ $output = strtr(':how :params', [
 );
 file_put_contents('result.' . $argv[1], $output);
 echo "Clients: {$theBest}\n";
+$theBest2 = getClientCounter($dataCollection, $theBestResults);
+echo "Clients: {$theBest2}\n";

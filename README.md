@@ -12,13 +12,18 @@ Clients: 5
 ```
 ```
 php hashcode.php c_coarse.in.txt
-Clients: 5
+Clients: 4
 ```
 ```
 php hashcode.php d_difficult.in.txt
-Clients: 1441
+Clients: 1516
 ```
 ```
 php hashcode.php e_elaborate.in.txt 
-Clients: 1409
+Clients: 1794
+```
+
+```
+1516+1794+2+5+4
+3321
 ```
