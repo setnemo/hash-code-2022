@@ -21,6 +21,13 @@ class DataCollection
     {
         return $this->items;
     }
+
+    public function reorder()
+    {
+        usort($this->items, static function(Data $a, Data $b) {
+            return $a->dislikedCount <=> $b->dislikedCount;
+        });
+    }
 }
 
 class Data
@@ -41,13 +48,13 @@ if (!isset($argv[1])) {
     die("usage: php hashcode.php path_to_file\n");
 }
 $file = file_get_contents($argv[1]);
-$arr1 = explode("\n", $file);
-$clientCounter = array_shift($arr1);
+$fileExploded = explode("\n", $file);
+$clientCounter = array_shift($fileExploded);
 $max = 2 * $clientCounter;
-$data = $dislikeSummary = $likeSummary = $all = $dislikedAll = $map = [];
+$data = $dislikeSummary = $likeSummary = $all = $dislikedAll = [];
 $dataCollection = new DataCollection();
 for ($i = 1; $i <= $max; ) {
-    $likeStr = $arr1[$i - 1];
+    $likeStr = $fileExploded[$i - 1];
     $likeArray = explode(' ', $likeStr);
     $likeCounter = array_shift($likeArray);
     $all = array_unique(array_merge($all, $likeArray), SORT_REGULAR);
@@ -55,7 +62,7 @@ for ($i = 1; $i <= $max; ) {
     $clientCounter = $i % 2 !== 0 ? $clientCounter - 1: $clientCounter;
     $data[$clientCounter][$key] = $likeArray;
     $i++;
-    $dislikeStr = $arr1[$i - 1];
+    $dislikeStr = $fileExploded[$i - 1];
     $dislikeArray = explode(' ', $dislikeStr);
     $dislikeCounter = array_shift($dislikeArray);
     $all = array_unique(array_merge($all, $dislikeArray), SORT_REGULAR);
@@ -72,19 +79,11 @@ for ($i = 1; $i <= $max; ) {
         implode('_',$dislikeArray),
         (int) $dislikeCounter,
     ));
-    foreach ($dislikeArray as $disliked) {
-        $dislikeSummary[$disliked] = array_merge($dislikeSummary[$disliked] ?? [], $likeArray);
-    }
-    foreach ($likeArray as $liked) {
-        $likeSummary[$liked] = array_merge($likeSummary[$liked] ?? [], $dislikeArray);
-    }
-    sort($dislikeArray);
-    sort($likeArray);
-    $map[implode('_', $likeArray)][] = $dislikeArray == [] ? null : implode('_', $dislikeArray);
 }
 $result = $mapping = [];
 array_push($all, '');
 sort($all);
+$dataCollection->reorder();
 foreach ($all as $product) {
     foreach ($dataCollection->all() as &$item) {
         if ($item->dislikedPrefix === $product && !in_array($product, $result)) {
