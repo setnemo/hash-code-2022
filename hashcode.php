@@ -51,24 +51,19 @@ $file = file_get_contents($argv[1]);
 $fileExploded = explode("\n", $file);
 $clientCounter = array_shift($fileExploded);
 $max = 2 * $clientCounter;
-$data = $dislikeSummary = $likeSummary = $all = $dislikedAll = [];
+$dislikeSummary = $likeSummary = $all = [];
 $dataCollection = new DataCollection();
 for ($i = 1; $i <= $max; ) {
+    $clientCounter = $i % 2 !== 0 ? $clientCounter - 1: $clientCounter;
     $likeStr = $fileExploded[$i - 1];
     $likeArray = explode(' ', $likeStr);
     $likeCounter = array_shift($likeArray);
     $all = array_unique(array_merge($all, $likeArray), SORT_REGULAR);
-    $key = 'like';
-    $clientCounter = $i % 2 !== 0 ? $clientCounter - 1: $clientCounter;
-    $data[$clientCounter][$key] = $likeArray;
     $i++;
     $dislikeStr = $fileExploded[$i - 1];
     $dislikeArray = explode(' ', $dislikeStr);
     $dislikeCounter = array_shift($dislikeArray);
     $all = array_unique(array_merge($all, $dislikeArray), SORT_REGULAR);
-    $dislikedAll = array_unique(array_merge($dislikedAll, $dislikeArray), SORT_REGULAR);
-    $key = 'dislike';
-    $data[$clientCounter][$key] = $dislikeArray;
     $i++;
     $dataCollection->push(new Data(
         $clientCounter,
