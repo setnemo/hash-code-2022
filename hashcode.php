@@ -87,7 +87,7 @@ $dataCollection->reorder();
 foreach ($all as $product) {
     foreach ($dataCollection->all() as &$item) {
         if ($item->dislikedPrefix === $product && !in_array($product, $result)) {
-            $result = array_merge($result, $item->liked);
+            $result = array_unique(array_merge($result, $item->liked), SORT_REGULAR);
         }
     }
 }
@@ -99,19 +99,17 @@ $output = strtr(':how :params', [
 );
 file_put_contents('result.' . $argv[1], $output);
 
-$checkResult = explode(' ', $output);
-array_shift($checkResult);
 $client = 0;
 foreach ($dataCollection->all() as $item) {
     $itLiked = 0;
     $itDisLiked = 0;
     foreach ($item->liked as $liked) {
-        if (in_array($liked, $checkResult)) {
+        if (in_array($liked, $result)) {
             $itLiked++;
         }
     }
     foreach ($item->disliked as $disliked) {
-        if (in_array($disliked, $checkResult)) {
+        if (in_array($disliked, $result)) {
             $itDisLiked++;
         }
     }
