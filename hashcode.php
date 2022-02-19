@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use JetBrains\PhpStorm\Pure;
+
 class DataCollection
 {
     /**
@@ -22,11 +24,20 @@ class DataCollection
         return $this->items;
     }
 
-    public function reorder()
+    public function reorder(): self
     {
         usort($this->items, static function(Data $a, Data $b) {
             return $a->dislikedCount <=> $b->dislikedCount;
         });
+
+        return $this;
+    }
+
+    public function remove(int $key): self
+    {
+        unset($this->items[$key]);
+
+        return $this;
     }
 }
 
@@ -35,10 +46,8 @@ class Data
     public function __construct(
         public int $customer,
         public array $liked,
-        public string $likedPrefix,
         public int $likedCount,
         public array $disliked,
-        public string $dislikedPrefix,
         public int $dislikedCount,
     ) {
     }
@@ -68,49 +77,94 @@ for ($i = 1; $i <= $max; ) {
     $dataCollection->push(new Data(
         $clientCounter,
         $likeArray,
-        implode('_',$likeArray),
         (int) $likeCounter,
         $dislikeArray,
-        implode('_',$dislikeArray),
         (int) $dislikeCounter,
     ));
 }
-$result = $mapping = [];
-array_push($all, '');
-sort($all);
-$dataCollection->reorder();
-foreach ($all as $product) {
-    foreach ($dataCollection->all() as &$item) {
-        if ($item->dislikedPrefix === $product && !in_array($product, $result)) {
-            $result = array_unique(array_merge($result, $item->liked), SORT_REGULAR);
+
+/**
+ * @param  array  $all
+ * @param  DataCollection  $dataCollection
+ * @param  int  $maxDislikeDepth
+ *
+ * @return array
+ */
+function getResultWithDepth(array $all, DataCollection $dataCollection, int $maxDislikeDepth = 0): array
+{
+    $result = [];
+    array_push($all, '');
+    sort($all);
+    $dataCollection->reorder();
+    ;
+    foreach ($all as $product) {
+        foreach ($dataCollection->all() as $key => $item) {
+            if (
+                count($item->disliked) <= $maxDislikeDepth
+                && ([] === $item->disliked || in_array($product, $item->disliked))
+                && !in_array($product, $result)
+            ) {
+                $result = array_unique(array_merge($result, $item->liked), SORT_REGULAR);
+                $dataCollection->remove($key);
+            }
         }
+    }
+
+    return $result;
+}
+
+/**
+ * @param  DataCollection  $dataCollectionCopy
+ * @param  array  $result
+ *
+ * @return int
+ */
+#[Pure] function getClientCounter(DataCollection $dataCollectionCopy, array $result): int
+{
+    $client = 0;
+    foreach ($dataCollectionCopy->all() as $key => $item) {
+        $itLiked    = 0;
+        $itDisLiked = 0;
+        foreach ($item->liked as $liked) {
+            if (in_array($liked, $result)) {
+                $itLiked++;
+            }
+        }
+        foreach ($item->disliked as $disliked) {
+            if (in_array($disliked, $result)) {
+                $itDisLiked++;
+            }
+        }
+        if ($item->likedCount === $itLiked && $itDisLiked === 0) {
+            $client++;
+        }
+    }
+
+    return $client;
+}
+
+$theBest = $client = $badResult = 0;
+$theBestResults = [];
+foreach (range(0,11) as $depth) {
+    $result = getResultWithDepth($all, clone $dataCollection, $depth);
+    $client = getClientCounter($dataCollection, $result);
+    if ($client > $theBest) {
+        $badResult = 0;
+        $theBest = $client;
+        $theBestResults = $result;
+    } else {
+        $badResult++;
+    }
+    if ($badResult === 3) {
+        break;
     }
 }
 
+
 $output = strtr(':how :params', [
-    ':how' => count($result),
-    ':params' => implode(' ', $result)
+        ':how' => count($theBestResults),
+        ':params' => implode(' ', $theBestResults)
     ]
 );
 file_put_contents('result.' . $argv[1], $output);
-
-$client = 0;
-foreach ($dataCollection->all() as $item) {
-    $itLiked = 0;
-    $itDisLiked = 0;
-    foreach ($item->liked as $liked) {
-        if (in_array($liked, $result)) {
-            $itLiked++;
-        }
-    }
-    foreach ($item->disliked as $disliked) {
-        if (in_array($disliked, $result)) {
-            $itDisLiked++;
-        }
-    }
-    if ($item->likedCount === $itLiked && $itDisLiked === 0) {
-        $client++;
-    }
-}
-
-echo "Clients: {$client}\n";
+echo "Clients: {$theBest}\n";

@@ -20,5 +20,5 @@ Clients: 1441
 ```
 ```
 php hashcode.php e_elaborate.in.txt 
-Clients: 1413
+Clients: 1409
 ```
