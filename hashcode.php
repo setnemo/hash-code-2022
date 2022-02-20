@@ -160,7 +160,7 @@ for ($i = 1; $i <= $max; ) {
  *
  * @return array
  */
-#[Pure] function getResult(DataCollection $dataCollection): array
+#[Pure] function secondAlgo(DataCollection $dataCollection): array
 {
     $disliked = $liked = [];
     $client = 0;
@@ -237,7 +237,7 @@ for ($i = 1; $i <= $max; ) {
  *
  * @return array
  */
-function extracted(DataCollection $dataTmp2, DataCollection $dataCopy, array &$results, int $customer, bool &$exit, bool $skip = true): array
+function thirdAlgo(DataCollection $dataTmp2, DataCollection $dataCopy, array &$results, int $customer, bool &$exit, bool $skip = true): array
 {
     foreach ($dataCopy->all() as $it => $item2) {
         if ($skip && $it < $customer) {
@@ -286,7 +286,6 @@ foreach ($dataCollection->all() as $customer => $item) {
         continue;
     }
 
-    echo "[$customer]: ";
     $results[$customer] = [
         'liked' => $item->liked,
         'disliked' => $item->disliked,
@@ -300,8 +299,8 @@ foreach ($dataCollection->all() as $customer => $item) {
     while (true) {
         $exit = true;
         $dataCopy = $dataTmp1;
-        list($exit, $results, $dataTmp2) = extracted($dataTmp2, $dataCopy, $results, $customer, $exit);
-        list($exit, $results, $dataTmp2) = extracted($dataTmp2, $dataCopy, $results, $customer, $exit, false);
+        [$exit, $results, $dataTmp2] = thirdAlgo($dataTmp2, $dataCopy, $results, $customer, $exit);
+        [$exit, $results, $dataTmp2] = thirdAlgo($dataTmp2, $dataCopy, $results, $customer, $exit, false);
         $results[$customer]['disliked'] = array_unique($results[$customer]['disliked'], SORT_REGULAR);
         $results[$customer]['liked'] = array_unique($results[$customer]['liked'], SORT_REGULAR);
         $results[$customer]['counter'] = count($results[$customer]['liked']);
@@ -313,7 +312,6 @@ foreach ($dataCollection->all() as $customer => $item) {
     $counter = array_column($results, 'counter');
     array_multisort($clients, SORT_DESC, $counter, SORT_ASC, $results);
     unset($results[20]);
-    echo "Clients: {$results[0]['clients']}\n";
 }
 $theBestResults = $results[0]['liked'];
 $theBest = $results[0]['clients'];
@@ -324,23 +322,21 @@ $output = strtr(':how :params', [
     ]
 );
 
-file_put_contents('result.' . $argv[1], $output);
-echo "Clients: {$theBest}\n";
-$theBest2 = getClientCounter($dataCollection, $results[0]['liked']);
-echo "Clients: {$theBest2}\n";
+file_put_contents('output/3.' . $argv[1] . '.out.txt', $output);
+echo "[3] Clients: {$theBest}\n";
 
 
 /**
  * 1516+1794+2+5+4
  * 3321
-
+ */
 $theBest = $client = $badResult = 0;
 $theBestResults = [];
 $dataCollection->reorderBack();
 $tt = $badResult = 0;
 $sliceDataCollection = $dataCollection;
 while (true) {
-    [$client, $result] = getResult($sliceDataCollection);
+    [$client, $result] = secondAlgo($sliceDataCollection);
     if ($client > $theBest) {
         $badResult = 0;
         $theBest = $client;
@@ -358,20 +354,18 @@ $output = strtr(':how :params', [
         ':params' => implode(' ', $theBestResults)
     ]
 );
-file_put_contents('result.' . $argv[1], $output);
-echo "Clients: {$theBest}\n";
- */
+file_put_contents('output/2.' . $argv[1] . '.out.txt', $output);
+echo "[2] Clients: {$theBest}\n";
+
 
 /**
  * 2+5+5+1537+1690
-
+ */
 $results = [];
 $results[] = ['liked' => [], 'disliked' => [], 'clients' => 0];
 $depth = intval(count($dataCollection->all())/20);
 $depth = $depth > 10 ? $depth : 10;
 foreach ($dataCollection->all() as $customer => $item) {
-    echo $customer % 100 === 0 ? PHP_EOL . "[$customer]: ": '';
-    echo '.';
     if ($customer > 0 && count($results) < $depth) {
         $results[] = ['liked' => [], 'disliked' => [], 'clients' => 0];
     }
@@ -412,9 +406,7 @@ $output = strtr(':how :params', [
         ':params' => implode(' ', array_keys($results[0]['liked']))
     ]
 );
-echo PHP_EOL;
-file_put_contents('result.' . $argv[1], $output);
-echo "Clients: {$results[0]['clients']}\n";
-$theBest2 = getClientCounter($dataCollection, array_keys($results[0]['liked']));
-echo "Clients: {$theBest2}\n";
- */
+file_put_contents('output/1.' . $argv[1] . '.out.txt', $output);
+echo "[1] Clients: {$results[0]['clients']}\n";
+
+
