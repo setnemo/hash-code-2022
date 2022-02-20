@@ -24,11 +24,35 @@ class DataCollection
         return $this->items;
     }
 
-    public function reorder(): self
+    public function remove(int $key): self
     {
-        usort($this->items, static function(Data $a, Data $b) {
-            return $a->dislikedCount < $b->dislikedCount;
-        });
+        $this->items[$key] = null;
+        unset($this->items[$key]);
+
+        return $this;
+    }
+
+    public function invert(bool $invert): self
+    {
+        if ($invert) {
+            return $this->reorder(true);
+        }
+
+        return $this->reorder(false);
+    }
+
+    public function reorder(bool $way = true): self
+    {
+        if ($way) {
+            usort($this->items, static function(Data $a, Data $b) {
+                return $a->dislikedCount < $b->dislikedCount;
+            });
+        } else {
+            usort($this->items, static function(Data $a, Data $b) {
+                return $a->likedCount < $b->likedCount;
+            });
+        }
+
 
         return $this;
     }
@@ -202,10 +226,114 @@ for ($i = 1; $i <= $max; ) {
     return $client;
 }
 
+
+/**
+ * @param  DataCollection  $dataTmp2
+ * @param  DataCollection  $dataCopy
+ * @param  array  $results
+ * @param  int  $customer
+ * @param  bool  $exit
+ * @param  bool  $skip
+ *
+ * @return array
+ */
+function extracted(DataCollection $dataTmp2, DataCollection $dataCopy, array &$results, int $customer, bool &$exit, bool $skip = true): array
+{
+    foreach ($dataCopy->all() as $it => $item2) {
+        if ($skip && $it < $customer) {
+            continue;
+        }
+        if ($skip === false && $it > $customer) {
+            continue;
+        }
+        $itDisLiked = 0;
+        $disliked   = $liked = [];
+        foreach ($item2->disliked as $itemDisliked) {
+            if (in_array($itemDisliked, $results[$customer]['liked'])) {
+                $itDisLiked++;
+            }
+            $disliked[$itemDisliked] = true;
+        }
+        foreach ($item2->liked as $itemLiked) {
+            $liked[$itemLiked] = true;
+            if (in_array($itemLiked, $results[$customer]['disliked'])) {
+                $itDisLiked++;
+            }
+        }
+        if ($itDisLiked === 0) {
+            $exit                           = false;
+            $results[$customer]['disliked'] = array_merge($results[$customer]['disliked'], array_keys($disliked));
+            $results[$customer]['liked']    = array_merge($results[$customer]['liked'], array_keys($liked));
+            $results[$customer]['clients']++;
+            $dataTmp2 = $dataCopy->remove($it);
+        }
+    }
+
+    return array($exit, $results, $dataTmp2);
+}
+
+/**
+ * 1554+1721+2+5+4
+ * 3286
+ */
+$results = [];
+$prevResult = $skip = 0;
+$currentResult = 1;
+$skips = intval(count($dataCollection->all()) / 5);
+$order = 0;
+foreach ($dataCollection->all() as $customer => $item) {
+    if ($skips > 500 && ($customer % 100) > 3) {
+        continue;
+    }
+
+    echo "[$customer]: ";
+    $results[$customer] = [
+        'liked' => $item->liked,
+        'disliked' => $item->disliked,
+        'clients' => 1,
+    ];
+    $order++;
+    $match = $order % 3;
+    $dc = clone $dataCollection;
+    $dataTmp2 = $dc->remove($customer);
+    $dataTmp1 = $dataTmp2;
+    while (true) {
+        $exit = true;
+        $dataCopy = $dataTmp1;
+        list($exit, $results, $dataTmp2) = extracted($dataTmp2, $dataCopy, $results, $customer, $exit);
+        list($exit, $results, $dataTmp2) = extracted($dataTmp2, $dataCopy, $results, $customer, $exit, false);
+        $results[$customer]['disliked'] = array_unique($results[$customer]['disliked'], SORT_REGULAR);
+        $results[$customer]['liked'] = array_unique($results[$customer]['liked'], SORT_REGULAR);
+        $results[$customer]['counter'] = count($results[$customer]['liked']);
+        if ($exit) {
+            break;
+        }
+    }
+    $clients = array_column($results, 'clients');
+    $counter = array_column($results, 'counter');
+    array_multisort($clients, SORT_DESC, $counter, SORT_ASC, $results);
+    unset($results[20]);
+    echo "Clients: {$results[0]['clients']}\n";
+}
+$theBestResults = $results[0]['liked'];
+$theBest = $results[0]['clients'];
+
+$output = strtr(':how :params', [
+        ':how' => count($theBestResults),
+        ':params' => implode(' ', $theBestResults)
+    ]
+);
+
+file_put_contents('result.' . $argv[1], $output);
+echo "Clients: {$theBest}\n";
+$theBest2 = getClientCounter($dataCollection, $results[0]['liked']);
+echo "Clients: {$theBest2}\n";
+
+
 /**
  * 1516+1794+2+5+4
  * 3321
- */
+
 $theBest = $client = $badResult = 0;
 $theBestResults = [];
 $dataCollection->reorderBack();
@@ -232,6 +360,7 @@ $output = strtr(':how :params', [
 );
 file_put_contents('result.' . $argv[1], $output);
 echo "Clients: {$theBest}\n";
+ */
 
 /**
  * 2+5+5+1537+1690
