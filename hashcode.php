@@ -110,19 +110,17 @@ $file = file_get_contents($argv[1]);
 $fileExploded = explode("\n", $file);
 $clientCounter = array_shift($fileExploded);
 $max = 2 * $clientCounter;
-$dislikeSummary = $likeSummary = $all = [];
+$dislikeSummary = $likeSummary = [];
 $dataCollection = new DataCollection();
 for ($i = 1; $i <= $max; ) {
     $clientCounter = $i % 2 !== 0 ? $clientCounter - 1: $clientCounter;
     $likeStr = $fileExploded[$i - 1];
     $likeArray = explode(' ', $likeStr);
     $likeCounter = array_shift($likeArray);
-    $all = array_unique(array_merge($all, $likeArray), SORT_REGULAR);
     $i++;
     $dislikeStr = $fileExploded[$i - 1];
     $dislikeArray = explode(' ', $dislikeStr);
     $dislikeCounter = array_shift($dislikeArray);
-    $all = array_unique(array_merge($all, $dislikeArray), SORT_REGULAR);
     $i++;
     $dataCollection->push(new Data(
         $clientCounter,
@@ -138,7 +136,7 @@ for ($i = 1; $i <= $max; ) {
  *
  * @return array
  */
-#[Pure] function getResultWithDepth(DataCollection $dataCollection): array
+#[Pure] function getResult(DataCollection $dataCollection): array
 {
     $disliked = $liked = [];
     $client = 0;
@@ -183,7 +181,7 @@ for ($i = 1; $i <= $max; ) {
 #[Pure] function getClientCounter(DataCollection $dataCollectionCopy, array $result): int
 {
     $client = 0;
-    foreach ($dataCollectionCopy->all() as $key => $item) {
+    foreach ($dataCollectionCopy->all() as $item) {
         $itLiked    = 0;
         $itDisLiked = 0;
         foreach ($item->liked as $liked) {
@@ -204,16 +202,17 @@ for ($i = 1; $i <= $max; ) {
     return $client;
 }
 
+/**
+ * 1516+1794+2+5+4
+ * 3321
+ */
 $theBest = $client = $badResult = 0;
 $theBestResults = [];
-array_push($all, '');
-sort($all);
 $dataCollection->reorderBack();
 $tt = $badResult = 0;
-$maxx = (int) (count($dataCollection->all()) / 10);
 $sliceDataCollection = $dataCollection;
 while (true) {
-    [$client, $result] = getResultWithDepth($sliceDataCollection);
+    [$client, $result] = getResult($sliceDataCollection);
     if ($client > $theBest) {
         $badResult = 0;
         $theBest = $client;
@@ -226,8 +225,6 @@ while (true) {
         break;
     }
 }
-
-
 $output = strtr(':how :params', [
         ':how' => count($theBestResults),
         ':params' => implode(' ', $theBestResults)
@@ -235,5 +232,60 @@ $output = strtr(':how :params', [
 );
 file_put_contents('result.' . $argv[1], $output);
 echo "Clients: {$theBest}\n";
-$theBest2 = getClientCounter($dataCollection, $theBestResults);
+
+/**
+ * 2+5+5+1537+1690
+
+$results = [];
+$results[] = ['liked' => [], 'disliked' => [], 'clients' => 0];
+$depth = intval(count($dataCollection->all())/20);
+$depth = $depth > 10 ? $depth : 10;
+foreach ($dataCollection->all() as $customer => $item) {
+    echo $customer % 100 === 0 ? PHP_EOL . "[$customer]: ": '';
+    echo '.';
+    if ($customer > 0 && count($results) < $depth) {
+        $results[] = ['liked' => [], 'disliked' => [], 'clients' => 0];
+    }
+    foreach ($results as $it => $result) {
+        $flag = false;
+        foreach ($item->disliked as $itemDisliked) {
+            if (in_array($itemDisliked, array_keys($result['liked']))) {
+                $flag = true;
+            }
+        }
+        if ($flag) {
+            continue;
+        }
+        foreach ($item->liked as $itemLiked) {
+            if (in_array($itemLiked, array_keys($result['disliked']))) {
+                $flag = true;
+            }
+        }
+        if ($flag) {
+            continue;
+        }
+        foreach ($item->disliked as $itemDisliked) {
+            $results[$it]['disliked'][$itemDisliked] = true;
+        }
+        foreach ($item->liked as $itemLiked) {
+            $results[$it]['liked'][$itemLiked] = true;
+
+        }
+        $results[$it]['clients']++;
+    }
+    usort($results, static function(array $a, array $b) {
+        return $a['clients'] < $b['clients'];
+    });
+    unset($results[$depth]);
+}
+$output = strtr(':how :params', [
+        ':how' => count($results[0]['liked']),
+        ':params' => implode(' ', array_keys($results[0]['liked']))
+    ]
+);
+echo PHP_EOL;
+file_put_contents('result.' . $argv[1], $output);
+echo "Clients: {$results[0]['clients']}\n";
+$theBest2 = getClientCounter($dataCollection, array_keys($results[0]['liked']));
 echo "Clients: {$theBest2}\n";
+ */
